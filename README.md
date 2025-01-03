@@ -1,6 +1,6 @@
 # exoplanet-weather
  
-This repository contains the Python pipeline used to systematically search for variability in the secondary eclipse depth of Kepler hot Jupiters in [Li and Shporer (2024)](https://ui.adsabs.harvard.edu/abs/2024AJ....167..245L/abstract), "A Search for Temporal Atmospheric Variability of Kepler and TESS Hot Jupiters". 
+This repository contains the Python pipeline used to systematically search for variability in the secondary eclipse depth of Kepler hot Jupiters in [Li and Shporer (2024)](https://ui.adsabs.harvard.edu/abs/2024AJ....167..245L/abstract), "A Search for Temporal Atmospheric Variability of Kepler Hot Jupiters". The code has been adapted to analyzing TESS data as well.
 
 1. `hermes.py` is used to batch download Kepler and TESS light curves.
 2. `seyfert.py` (SEcondarY eclipse FittER Tool) is used to fit the secondary eclipse depth in each Kepler quarter with Bayesian inference/MCMC. The secondary eclipse light curve model is in `util/exoplanets.py`.
