@@ -1,50 +1,37 @@
-#!/Users/canis/dev/astro/shporer/venv/bin/python
+#!/usr/bin/env python
 """ SEYFERT: SEcondarY eclipse FittER Tool"""
 
-############################################ Computing configuration ######################################################
 """Limit numpy cores"""
 import os, socket
-# if socket.gethostname() in ['uzay.mit.edu', 'tessscience.mit.edu']:
-#         print('%%%%%%%%%%%%%%%%%%%% MAKE SURE TO UPDATE canislib')
-print(f'hostname: {socket.gethostname()}')
-if socket.gethostname() in ['uzay.mit.edu']:
-    num_cores = 10
-elif socket.gethostname() in ['tessscience.mit.edu']:
-    num_cores = 2
-else: 
-    num_cores = 2
+num_cores = 2
 print(f'Setting max cores to {num_cores}')
 os.environ.update(OMP_NUM_THREADS=f'{num_cores}', OPENBLAS_NUM_THREADS=f'{num_cores}', 
                   NUMEXPR_NUM_THREADS=f'{num_cores}', MKL_NUM_THREADS=f'{num_cores}')
 
 """Set separate compile dir for theano""" 
-if socket.gethostname() in ['uzay.mit.edu']:
-    import time
-    # https://github.com/abuzarmahmood/pytau/blob/master/pytau/utils/batch_utils/single_process.sh
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    unixtime = int(time.time())
-    os.environ['THEANO_FLAGS'] = rf'base_compiledir={dir_path}/.parallel_temp/temp_compile_dir/{unixtime}/.theano'
-    print('Set theano compile dir to')
-    print(os.environ['THEANO_FLAGS'])
-#######################################################################################################################
+import time
+dir_path = os.path.dirname(os.path.realpath(__file__))
+unixtime = int(time.time())
+os.environ['THEANO_FLAGS'] = rf'base_compiledir={dir_path}/.parallel_temp/temp_compile_dir/{unixtime}/.theano'
+print('Set theano compile dir to')
+print(os.environ['THEANO_FLAGS'])
 
-import time, os, sys, argparse
-from icecream import ic
-from glob import glob
+import time, sys, argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from natsort import natsorted
-from canislib.data import psave, pload, pickle_save, textload # for saving traces since dill breaks
-from canislib.timeseriestools import (remove_nans, sigma_clip, phase_fold, sorted_by_time, 
-                                bin_by_time, stitch_quarters, preprocess_transit_lc,
-                                dict_to_tuple, stitch_sectors, box_ls, convert_time)
+import lmfit
 from inputimeout import inputimeout, TimeoutOccurred
 from astropy.table import Table
-import lmfit
-from canislib.exoplanets import (load_lightcurve, fit_secondary_eclipse_minimal,    fit_secondary_eclipse_multiplanet ,add_eccentricity_priors,
-                                load_priors_versatile, is_multiplanet, is_eccentric, PlanetNotFoundError, 
-                                root)
-from canislib.misc import print_bold, print_hline
+
+
+from util.data import psave, pload, pickle_save, textload
+from util.timeseriestools import (remove_nans, sigma_clip, phase_fold,
+                                  sorted_by_time, stitch_quarters,
+                                  dict_to_tuple, stitch_sectors)
+from util.exoplanets import (load_lightcurve, fit_secondary_eclipse_minimal, fit_secondary_eclipse_multiplanet ,
+                             add_eccentricity_priors, load_priors_versatile, is_multiplanet, is_eccentric, 
+                             PlanetNotFoundError)
+from util.logging import print_bold, print_hline
 
 def make_groups(sectors, max_gap = 4): # max gap is difference in sector numbers
     """Group clumps of sectors together"""
@@ -240,7 +227,7 @@ def run_analysis(planet, config):
     time_format='btjd' if mission == 'TESS' else 'bkjd'
     priors = load_priors_versatile(planet, time_format=time_format, t=data['time'], y=data['flux'], override_with_BLS=config.force_BLS) # If missing t0, run BLS from all data stitched
 
-    fit_eccentricity = is_eccentric(planet) #### HARD CODED
+    fit_eccentricity = is_eccentric(planet)
     if fit_eccentricity:
         add_eccentricity_priors(priors, planet)
         print_bold('fitting eccentricity')
@@ -274,15 +261,11 @@ def run_analysis(planet, config):
                                     method=='LS' and row['ls_transit_depth'] != 0 or
                                     method in ['MAP', 'MCMC'] and row['map_transit_depth'] != 0 and not sample_mcmc_cumulative or
                                     method == 'MCMC' and os.path.exists(f'{mcmc_dir}/{planet}_{span}_MCMC.{mission}.{pipeline}.{bitmask}.p') and sample_mcmc_cumulative)
-            # print(method == 'MAP', row['map_transit_depth'] != 0, not sample_mcmc_cumulative)
         else:
             already_done = (method=='median' and row['median_transit_depth'] != 0 or 
                                     method=='LS' and row['ls_transit_depth'] != 0 or
                                     method in ['MAP', 'MCMC'] and row['map_transit_depth'] != 0 and not sample_mcmc or
                                     method == 'MCMC' and os.path.exists(f'{mcmc_dir}/{planet}_{span}_MCMC.{mission}.{pipeline}.{bitmask}.p') and sample_mcmc)
-            # print(os.path.exists(f'{mcmc_dir}/{planet}_{span}_MCMC.{mission}.{pipeline}.{bitmask}.p'), already_done)
-            # print(method == 'MCMC', os.path.exists(f'{mcmc_dir}/{planet}_{span}_MCMC.{mission}.{pipeline}.{bitmask}.p'), sample_mcmc)
-            # print(f'{mcmc_dir}/{planet}_{span}_MCMC.{mission}.{pipeline}.{bitmask}.p')
         return already_done
 
     def analyze_and_store(row, t, y, yerr, priors, figdirout, multiplanet):
@@ -385,7 +368,7 @@ def run_analysis(planet, config):
                 t, y, yerr = stitch_sectors(data['sectors'])
             t, y, yerr = sorted_by_time(*remove_nans(t, y, yerr))
             y -= 1
-            ### Custom sample_mcmc setting for cumulative. Sorry this is ugly!
+            ### Custom sample_mcmc setting for cumulative.
             temp = sample_mcmc
             sample_mcmc = sample_mcmc_cumulative
             print(f'{sample_mcmc = }')
@@ -410,29 +393,28 @@ def run_analysis(planet, config):
     if cumulative['failed'] == False:
         if do_cumulative:
             assert cumulative['map_transit_depth'] != 0
-        """DON'T Reuse priors from cumulative"""
         if reuse_priors_from_cumulative := False:
-            # if multiplanet:
-            #     # for key in ['u_star', 'log_rho_gp', 'log_sigma_gp', 'log_sigma_lc']:
-            #     #     try:
-            #     #         priors[key] = np.float64(cumulative['map_soln'][key])
-            #     #     except TypeError:
-            #     #         continue
-            #     planets = [x for x in sorted(priors.keys()) if len(x) == 1]
-            #     for p in planets:
-            #         for key in ['a', 'b', 'ror', 'se_depth']:
-            #             try:
-            #                 priors[p][key] = np.float64(cumulative['map_soln'][f'{key}_{p}'])
-            #             except TypeError:
-            #                 continue
+            if multiplanet:
+                # for key in ['u_star', 'log_rho_gp', 'log_sigma_gp', 'log_sigma_lc']:
+                #     try:
+                #         priors[key] = np.float64(cumulative['map_soln'][key])
+                #     except TypeError:
+                #         continue
+                planets = [x for x in sorted(priors.keys()) if len(x) == 1]
+                for p in planets:
+                    for key in ['a', 'b', 'ror', 'se_depth']:
+                        try:
+                            priors[p][key] = np.float64(cumulative['map_soln'][f'{key}_{p}'])
+                        except TypeError:
+                            continue
 
-            # else:
-            #     for key in ['a', 'b', 'ror', 'se_depth', 'u_star']:
-            #         try:
-            #             priors[key] = np.float64(cumulative['map_soln'][key])
-            #         except TypeError:
-            #             continue
-            pass
+            else:
+                for key in ['a', 'b', 'ror', 'se_depth', 'u_star']:
+                    try:
+                        priors[key] = np.float64(cumulative['map_soln'][key])
+                    except TypeError:
+                        continue
+
     else:
         print_bold('Skipping individual sectors/quarters since cumulative failed', color='red')
         return "fail"
@@ -546,7 +528,7 @@ def run_analysis(planet, config):
         
         print(f'priors: {priors}\n')
         
-        for quarter in data['quarters'].keys(): # The variable quarter repreesnts either a quarter or a sector!
+        for quarter in data['quarters'].keys():
             for j in range(1, 3+1):
                 figdirout = f'{figs_dir}/{planet}/{mission}.{pipeline}.{bitmask}/Q{quarter}_{j}'
                 os.makedirs(figdirout, exist_ok=True)
@@ -608,7 +590,6 @@ def run_analysis(planet, config):
                 analyze_and_store(row, t, y, yerr, priors=priors, figdirout=figdirout, multiplanet=multiplanet)
                 psave(results, fio_results, verbose=False)
 
-    #psave(results, fio_results)
     return "success"
 
 
@@ -686,7 +667,7 @@ def create_results_tb(planet, mission, fout, mode='quarters', sectors=None):
     
     psave(results, fout)
 
-#@Gooey
+
 def main():
     parser = argparse.ArgumentParser(
                     prog='SEYFERT',

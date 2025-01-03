@@ -1,29 +1,22 @@
-#!/users/canis/dev/astro/shporer/venv/bin/python
+#!/usr/bin/env python
 import os, argparse, time
 import warnings
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from canislib.data import psave, pload
-from canislib.timeseriestools import remove_nans, running_mean, sorted_by_time
-from canislib.misc import print_bold, print_hline
 from tqdm import tqdm
 from natsort import natsorted
 from glob import glob
 from inputimeout import inputimeout, TimeoutOccurred
 from dill import UnpicklingError
-from canislib.exoplanets import compute_transit_depth, load_results, is_multiplanet, tildes_to_spaces
+
+from util.data import psave, pload
+from util.timeseriestools import remove_nans, running_mean, sorted_by_time
+from util.misc import print_bold, print_hline
+from util.exoplanets import compute_transit_depth, load_results, is_multiplanet, tildes_to_spaces
 
 warnings.filterwarnings('ignore')
 
-"""make sure to investigate these later"""
-bad_quarters = {
-    'Kepler-4~b': [14, 15],
-    'Kepler-488~b': [7]
-}
-bad_sectors_QLP = {
-    'KELT-7~b': [45]
-}
 
 def plot_depths(ax, timestamps, results, emph=False, annotation="", low_alpha=False):
     """Plot temporal 2nd eclipse and transit depths"""

@@ -1,6 +1,7 @@
 """
-Utilities for working with exoplanet data
+Tools for working with exoplanet data
 """
+
 import os, copy, socket
 from glob import glob
 
@@ -18,12 +19,6 @@ from canislib.misc import fstr_ratio, print_bold
 from canislib.data import pload, psave
 from pickle import UnpicklingError
 
-
-if socket.gethostname() in 'uzay.mit.edu':
-    root = '/scratch/canisli'
-    # root = '/home/canisli'
-else:
-    root = '/users/canis/dev/astro/shporer'
 
 # ------------------------------ Useful numbers ---------------------------------
 au = 1.496e11
@@ -50,14 +45,16 @@ quarter_boundaries = {0: [120, 131],
 
 # ------------------------------ Radiometry ---------------------------------
 
+root = '.'
+
 def load_passband(mission):
     match mission:
         case 'Kepler':
-            wl, tr = np.transpose(np.loadtxt('/users/canis/dev/astro/shporer/data/passband/Kepler_transmission.txt', skiprows=1))
+            wl, tr = np.transpose(np.loadtxt('f{root}/data/passband/Kepler_transmission.txt', skiprows=1))
         case 'TESS':
-            wl, tr = np.transpose(np.loadtxt('/users/canis/dev/astro/shporer/data/passband/tess-response-function-v1.0.csv', skiprows=8, delimiter=','))
+            wl, tr = np.transpose(np.loadtxt('f{root}/data/passband/tess-response-function-v1.0.csv', skiprows=8, delimiter=','))
         case 'CHEOPS':
-            wl, QE, throughput, tr = np.transpose(np.loadtxt('/users/canis/dev/astro/shporer/data/passband/CHEOPS_bandpass.csv', skiprows=1, delimiter=','))
+            wl, QE, throughput, tr = np.transpose(np.loadtxt('f{root}/data/passband/CHEOPS_bandpass.csv', skiprows=1, delimiter=','))
 
     return wl, tr
 

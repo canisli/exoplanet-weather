@@ -1,4 +1,4 @@
-#!/Users/canis/dev/astro/shporer/venv/bin/python
+#!/usr/bin/env python
 
 import requests
 import os, sys, argparse
